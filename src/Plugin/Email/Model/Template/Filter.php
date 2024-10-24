@@ -7,7 +7,6 @@ namespace Infrangible\CmsFilter\Plugin\Email\Model\Template;
 use FeWeDev\Base\Arrays;
 use Infrangible\CmsFilter\Model\Template\Filter\HashTranslateDirective;
 use Infrangible\CmsFilter\Model\Template\Filter\HashVarDirective;
-use Infrangible\CmsFilter\Model\Template\Filter\TranslateDirective;
 use Magento\Framework\App\ObjectManager;
 
 /**
@@ -30,12 +29,12 @@ class Filter
     public function afterSetVariables(
         \Magento\Email\Model\Template\Filter $subject,
         \Magento\Email\Model\Template\Filter $result,
-        array $variables): \Magento\Email\Model\Template\Filter
-    {
+        array $variables
+    ): \Magento\Email\Model\Template\Filter {
         $hash = spl_object_hash($subject);
 
         foreach ($variables as $name => $value) {
-            $this->templateVars[$hash][$name] = $value;
+            $this->templateVars[ $hash ][ $name ] = $value;
         }
 
         return $result;
@@ -52,42 +51,56 @@ class Filter
         /** @var HashVarDirective $hashVarDirective */
         $hashVarDirective = ObjectManager::getInstance()->get(HashVarDirective::class);
 
-        if (preg_match_all($hashVarDirective->getRegularExpression(), (string)$value, $constructions, PREG_SET_ORDER)) {
+        if (preg_match_all(
+            $hashVarDirective->getRegularExpression(),
+            (string)$value,
+            $constructions,
+            PREG_SET_ORDER
+        )) {
             foreach ($constructions as $construction) {
                 $replacedValue = $hashVarDirective->process(
                     $construction,
                     $subject,
-                    $this->arrays->getValue($this->templateVars, $hash, []));
+                    $this->arrays->getValue(
+                        $this->templateVars,
+                        $hash,
+                        []
+                    )
+                );
 
-                $value = str_replace($construction[0], $replacedValue, $value);
-            }
-        }
-
-        /** @var TranslateDirective $hashTransDirective */
-        $hashTransDirective = ObjectManager::getInstance()->get(TranslateDirective::class);
-
-        if (preg_match_all($hashTransDirective->getRegularExpression(), $value, $constructions, PREG_SET_ORDER)) {
-            foreach ($constructions as $construction) {
-                $replacedValue = $hashTransDirective->process(
-                    $construction,
-                    $subject,
-                    $this->arrays->getValue($this->templateVars, $hash, []));
-
-                $value = str_replace($construction[0], $replacedValue, $value);
+                $value = str_replace(
+                    $construction[ 0 ],
+                    $replacedValue,
+                    $value
+                );
             }
         }
 
         /** @var HashTranslateDirective $hashTransDirective */
         $hashTransDirective = ObjectManager::getInstance()->get(HashTranslateDirective::class);
 
-        if (preg_match_all($hashTransDirective->getRegularExpression(), $value, $constructions, PREG_SET_ORDER)) {
+        if (preg_match_all(
+            $hashTransDirective->getRegularExpression(),
+            $value,
+            $constructions,
+            PREG_SET_ORDER
+        )) {
             foreach ($constructions as $construction) {
                 $replacedValue = $hashTransDirective->process(
                     $construction,
                     $subject,
-                    $this->arrays->getValue($this->templateVars, $hash, []));
+                    $this->arrays->getValue(
+                        $this->templateVars,
+                        $hash,
+                        []
+                    )
+                );
 
-                $value = str_replace($construction[0], $replacedValue, $value);
+                $value = str_replace(
+                    $construction[ 0 ],
+                    $replacedValue,
+                    $value
+                );
             }
         }
 
@@ -97,15 +110,29 @@ class Filter
     public function afterVarDirective(
         \Magento\Email\Model\Template\Filter $subject,
         ?string $result,
-        array $construction = []): ?string
-    {
-        $value =
-            $this->arrays->getValue($construction, '2', '') . $this->arrays->getValue($construction, 'filters', '');
+        array $construction = []
+    ): ?string {
+        $value = $this->arrays->getValue(
+                $construction,
+                '2',
+                ''
+            ) . $this->arrays->getValue(
+                $construction,
+                'filters',
+                ''
+            );
 
-        $parts = explode('|', $value, 2);
+        $parts = explode(
+            '|',
+            $value,
+            2
+        );
 
         if (2 === count($parts)) {
-            $modifier = $this->arrays->getValue($parts, '1');
+            $modifier = $this->arrays->getValue(
+                $parts,
+                '1'
+            );
 
             if ($modifier === 'filter') {
                 $result = $subject->filter($result);
