@@ -2,12 +2,12 @@
     "name": "infrangible/m2-cms-filter",
     "description": "Infrangible Magento 2 CMS Filter",
     "type": "magento2-module",
-    "version": "1.0.2",
+    "version": "2.0.0",
     "license": "MIT",
     "keywords": [
         "Magento"
     ],
-    "homepage": "https://github.com/infrangible-dev/m2-cms-filter",
+    "homepage": "https://www.infrangible.dev/modules/cms-filter",
     "authors": [
         {
             "name": "Andreas Knollmann",
@@ -17,9 +17,10 @@
         }
     ],
     "require": {
-        "php": ">=7.1",
-        "magento/framework": "~102.0.0|~103.0.0",
-        "infrangible/m2-foundation": "~2.2.0"
+        "php": ">=8.2",
+        "infrangible/m2-foundation": "~3.0.1",
+        "magento/framework": "~103.0.6",
+        "magento/module-email": "~101.1.0"
     },
     "autoload": {
         "files": [

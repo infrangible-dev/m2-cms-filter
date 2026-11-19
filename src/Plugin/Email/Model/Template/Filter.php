@@ -2,143 +2,148 @@
 
 declare(strict_types=1);
 
-namespace Infrangible\CmsFilter\Plugin\Email\Model\Template;
-
-use FeWeDev\Base\Arrays;
-use Infrangible\CmsFilter\Model\Template\Filter\HashTranslateDirective;
-use Infrangible\CmsFilter\Model\Template\Filter\HashVarDirective;
-use Magento\Framework\App\ObjectManager;
-
 /**
  * @author      Andreas Knollmann
- * @copyright   2014-2024 Softwareentwicklung Andreas Knollmann
+ * @copyright   Copyright (c) 2014-2026 Softwareentwicklung Andreas Knollmann
  * @license     http://www.opensource.org/licenses/mit-license.php MIT
+ */
+
+namespace Infrangible\CmsFilter\Plugin\Email\Model\Template;
+
+use Infrangible\CmsFilter\Model\Template\Filter\HashTranslateDirective;
+use Infrangible\CmsFilter\Model\Template\Filter\HashVarDirective;
+use Magento\Email\Model\Template\Filter as EmailFilter;
+use Magento\Framework\Filter\DirectiveProcessorInterface;
+use WeakMap;
+
+/**
+ * Adds the directives #var# and #trans# and the modifier "filter" of {{var}} to the template filters of Magento (the
+ * filters of e-mails, CMS pages and blocks and widgets).
  */
 class Filter
 {
-    /** @var Arrays */
-    protected $arrays;
+    /**
+     * The variables of each filter, which the filter does not return itself.
+     *
+     * @var WeakMap<EmailFilter, array<string, mixed>>
+     */
+    private WeakMap $templateVariables;
 
-    private $templateVars = [];
-
-    public function __construct(Arrays $arrays)
-    {
-        $this->arrays = $arrays;
+    /**
+     * @param HashVarDirective $hashVarDirective
+     * @param HashTranslateDirective $hashTranslateDirective
+     */
+    public function __construct(
+        protected HashVarDirective $hashVarDirective,
+        protected HashTranslateDirective $hashTranslateDirective
+    ) {
+        $this->templateVariables = new WeakMap();
     }
 
-    public function afterSetVariables(
-        \Magento\Email\Model\Template\Filter $subject,
-        \Magento\Email\Model\Template\Filter $result,
-        array $variables
-    ): \Magento\Email\Model\Template\Filter {
-        $hash = spl_object_hash($subject);
-
-        foreach ($variables as $name => $value) {
-            $this->templateVars[ $hash ][ $name ] = $value;
-        }
+    /**
+     * Remembers the variables of the filter.
+     *
+     * @param EmailFilter $subject
+     * @param EmailFilter $result
+     * @param array $variables
+     * @phpstan-param array<string, mixed> $variables
+     *
+     * @return EmailFilter
+     */
+    public function afterSetVariables(EmailFilter $subject, EmailFilter $result, array $variables): EmailFilter
+    {
+        $this->templateVariables[ $subject ] = array_merge($this->templateVariables[ $subject ] ?? [], $variables);
 
         return $result;
     }
 
-    public function beforeFilter(\Magento\Email\Model\Template\Filter $subject, $value): array
+    /**
+     * Replaces the directives #var# and #trans# before Magento processes the other directives.
+     *
+     * So they can be used in the parameters of other directives.
+     *
+     * @param EmailFilter $subject
+     * @param mixed $value
+     *
+     * @return array
+     * @phpstan-return array{0: mixed}
+     */
+    public function beforeFilter(EmailFilter $subject, mixed $value): array
     {
         if ($value === null) {
             return [''];
         }
 
-        $hash = spl_object_hash($subject);
-
-        /** @var HashVarDirective $hashVarDirective */
-        $hashVarDirective = ObjectManager::getInstance()->get(HashVarDirective::class);
-
-        if (preg_match_all(
-            $hashVarDirective->getRegularExpression(),
-            (string)$value,
-            $constructions,
-            PREG_SET_ORDER
-        )) {
-            foreach ($constructions as $construction) {
-                $replacedValue = $hashVarDirective->process(
-                    $construction,
-                    $subject,
-                    $this->arrays->getValue(
-                        $this->templateVars,
-                        $hash,
-                        []
-                    )
-                );
-
-                $value = str_replace(
-                    $construction[ 0 ],
-                    $replacedValue,
-                    $value
-                );
-            }
+        if (! is_string($value)) {
+            // Magento reports the invalid value
+            return [$value];
         }
 
-        /** @var HashTranslateDirective $hashTransDirective */
-        $hashTransDirective = ObjectManager::getInstance()->get(HashTranslateDirective::class);
+        $templateVariables = $this->templateVariables[ $subject ] ?? [];
 
-        if (preg_match_all(
-            $hashTransDirective->getRegularExpression(),
-            $value,
-            $constructions,
-            PREG_SET_ORDER
-        )) {
-            foreach ($constructions as $construction) {
-                $replacedValue = $hashTransDirective->process(
-                    $construction,
-                    $subject,
-                    $this->arrays->getValue(
-                        $this->templateVars,
-                        $hash,
-                        []
-                    )
-                );
-
-                $value = str_replace(
-                    $construction[ 0 ],
-                    $replacedValue,
-                    $value
-                );
-            }
-        }
+        $value = $this->replace($this->hashVarDirective, $value, $subject, $templateVariables);
+        $value = $this->replace($this->hashTranslateDirective, $value, $subject, $templateVariables);
 
         return [$value];
     }
 
-    public function afterVarDirective(
-        \Magento\Email\Model\Template\Filter $subject,
-        ?string $result,
-        array $construction = []
-    ): ?string {
-        $value = $this->arrays->getValue(
-                $construction,
-                '2',
-                ''
-            ) . $this->arrays->getValue(
-                $construction,
-                'filters',
-                ''
-            );
-
-        $parts = explode(
-            '|',
-            $value,
-            2
-        );
-
-        if (2 === count($parts)) {
-            $modifier = $this->arrays->getValue(
-                $parts,
-                '1'
-            );
-
-            if ($modifier === 'filter') {
-                $result = $subject->filter($result);
-            }
+    /**
+     * Filters the value of {{var}} again if the modifier "filter" is given.
+     *
+     * For example {{var content|filter}}: the directives of the value are processed as well.
+     *
+     * @param EmailFilter $subject
+     * @param string|null $result
+     * @param array $construction
+     * @phpstan-param array<int|string, string> $construction
+     *
+     * @return string|null
+     */
+    public function afterVarDirective(EmailFilter $subject, ?string $result, array $construction = []): ?string
+    {
+        if ($result === null) {
+            return null;
         }
 
-        return $result;
+        $modifiers = explode('|', ($construction[ 2 ] ?? '') . ($construction[ 'filters' ] ?? ''));
+
+        array_shift($modifiers);
+
+        if (! in_array('filter', array_map('trim', $modifiers), true)) {
+            return $result;
+        }
+
+        // @phpstan-ignore missingType.checkedException (the e-mail filter catches exceptions, PHPStan inherits the tag)
+        return $subject->filter($result);
+    }
+
+    /**
+     * Replaces the constructions of the directive in the value.
+     *
+     * @param DirectiveProcessorInterface $directive
+     * @param string $value
+     * @param EmailFilter $filter
+     * @param array $templateVariables
+     * @phpstan-param array<string, mixed> $templateVariables
+     *
+     * @return string
+     */
+    private function replace(
+        DirectiveProcessorInterface $directive,
+        string $value,
+        EmailFilter $filter,
+        array $templateVariables
+    ): string {
+        $result = preg_replace_callback(
+            $directive->getRegularExpression(),
+            static fn(array $construction): string => $directive->process(
+                $construction,
+                $filter,
+                $templateVariables
+            ),
+            $value
+        );
+
+        return $result ?? $value;
     }
 }
