@@ -22,6 +22,9 @@
         "magento/framework": "~103.0.6",
         "magento/module-email": "~101.1.0"
     },
+    "require-dev": {
+        "infrangible/phpstan-magento": "~1.0.0"
+    },
     "autoload": {
         "files": [
             "src/registration.php"

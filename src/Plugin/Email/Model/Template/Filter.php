@@ -113,7 +113,6 @@ class Filter
             return $result;
         }
 
-        // @phpstan-ignore missingType.checkedException (the e-mail filter catches exceptions, PHPStan inherits the tag)
         return $subject->filter($result);
     }
 
