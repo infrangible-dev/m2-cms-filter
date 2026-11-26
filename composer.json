@@ -2,7 +2,7 @@
     "name": "infrangible/m2-cms-filter",
     "description": "Extends the template syntax of CMS pages and blocks with conditions inside loops, short placeholders for variables and translations, and nested content processing.",
     "type": "magento2-module",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "license": "MIT",
     "keywords": [
         "Magento",
@@ -20,7 +20,7 @@
         }
     ],
     "require": {
-        "php": ">=8.2",
+        "php": ">=8.1",
         "infrangible/m2-foundation": "~3.0.1",
         "magento/framework": "~103.0.6",
         "magento/module-email": "~101.1.0"
